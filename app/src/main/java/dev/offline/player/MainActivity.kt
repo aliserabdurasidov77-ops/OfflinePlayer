@@ -208,7 +208,9 @@ object Hub {
     fun init(c: Context) {
         if (::player.isInitialized) return
         ctx = c.applicationContext
-        player = ExoPlayer.Builder(ctx).setHandleAudioFocus(true).setWakeMode(C.WAKE_MODE_LOCAL).build()
+        player = ExoPlayer.Builder(ctx)
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
+            .setWakeMode(C.WAKE_MODE_LOCAL).build()
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(p: Boolean) { playing.value = p; if (!p) Store.flush() }
             override fun onMediaItemTransition(item: MediaItem?, reason: Int) {
@@ -312,7 +314,7 @@ fun total(ms: Long): String { val m = ms / 60000; return if (m >= 60) "${m / 60}
         }
     }
 }
-@Composable fun SongRow(s: Song, onClick: () -> Unit, onRemove: (() -> Unit)? = null) {
+@Composable fun SongRow(s: Song, onRemove: (() -> Unit)? = null, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Art(s.art, 46); Spacer(Modifier.width(12.dp))
@@ -358,7 +360,7 @@ fun total(ms: Long): String { val m = ms / 60000; return if (m >= 60) "${m / 60}
         confirmButton = { TextButton({ ok(v) }) { Text("OK") } },
         dismissButton = { TextButton(close) { Text("Отмена") } })
 }
-@Composable fun IconRow(ic: ImageVector, title: String, sub: String?, onClick: () -> Unit, art: Uri? = null, round: Boolean = false) {
+@Composable fun IconRow(ic: ImageVector, title: String, sub: String?, art: Uri? = null, round: Boolean = false, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         if (art != null || round) Art(art, 46, if (round) 23 else 8)
         else Box(Modifier.size(46.dp).clip(RoundedCornerShape(8.dp)).background(S2), contentAlignment = Alignment.Center) { Icon(ic, null, tint = Color.White) }
@@ -684,6 +686,7 @@ fun importM3u(ctx: Context, u: Uri) {
             0 -> items(songs.size) { i -> SongRow(songs[i]) { Hub.play(songs.toList(), i, "Local Music") } }
             1 -> { val a = Repo.artists(); items(a.size) { i ->
                 IconRow(Icons.Rounded.Person, a[i].key, "${a[i].value.size} songs",
+                    a[i].value[0].art, true) { nav.navigate("list/artist/${Uri.encode(a[i].key)}") } } }
                     { nav.navigate("list/artist/${Uri.encode(a[i].key)}") }, a[i].value[0].art, true) } }
             2 -> { val rows = Repo.albums().chunked(2); items(rows.size) { i ->
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -763,7 +766,7 @@ fun importM3u(ctx: Context, u: Uri) {
             }
         }
         items(list.size) { i ->
-            SongRow(list[i], { Hub.play(list, i, title) }) { if (liked) Store.like(list[i].id) else Store.rem(name, list[i].id) }
+                       SongRow(list[i], onRemove = { if (liked) Store.like(list[i].id) else Store.rem(name, list[i].id) }) { Hub.play(list, i, title) }
         }
     }
     if (pick) PickDlg({ pick = false }) { sel -> Store.add(name, sel); pick = false }
