@@ -709,7 +709,86 @@ fun importM3u(ctx: Context, u: Uri) {
     }
 }
 
-@Composable fun ListScreen(nav: NavController, type: String, key: String) {
+@Composable fun LocalScreen(nav: NavController) {
+    var tab by remember { mutableStateOf(0) }
+    val tabs = listOf("Songs", "Artists", "Albums", "Playlists", "Folders")
+    val songs = Repo.songs
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 20.dp)) {
+        item {
+            Column(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.size(180.dp).clip(RoundedCornerShape(12.dp)).background(S1), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.Folder, null, Modifier.size(72.dp), tint = T2)
+                }
+                Spacer(Modifier.height(14.dp))
+                Text("Local Music", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Audio files on device", color = T2, fontSize = 14.sp)
+                Text("${songs.size} Tracks · ${total(songs.sumOf { it.dur })}", color = T2, fontSize = 13.sp)
+            }
+        }
+        item {
+            PlayShuffle(
+                { Hub.play(songs.toList(), 0, "Local Music") },
+                { Hub.play(songs.toList(), 0, "Local Music", true) }
+            )
+        }
+        item {
+            ScrollableTabRow(selectedTabIndex = tab, containerColor = BG, edgePadding = 12.dp) {
+                tabs.forEachIndexed { i, t ->
+                    Tab(text = { Text(t) }, selected = tab == i, onClick = { tab = i })
+                }
+            }
+        }
+        when (tab) {
+            0 -> items(songs.size) { i ->
+                SongRow(songs[i]) { Hub.play(songs.toList(), i, "Local Music") }
+            }
+            1 -> {
+                val a = Repo.artists()
+                items(a.size) { i ->
+                    IconRow(Icons.Rounded.Person, a[i].key, "${a[i].value.size} songs", a[i].value[0].art, true) {
+                        nav.navigate("list/artist/${Uri.encode(a[i].key)}")
+                    }
+                }
+            }
+            2 -> {
+                val rows = Repo.albums().chunked(2)
+                items(rows.size) { i ->
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        rows[i].forEach { g ->
+                            Column(Modifier.weight(1f).clickable { nav.navigate("list/album/${g[0].albumId}") }) {
+                                ArtBig(g[0].art, Modifier.fillMaxWidth())
+                                Text(g[0].album, maxLines = 1, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                                Text(g[0].artist, maxLines = 1, fontSize = 12.sp, color = T2)
+                            }
+                        }
+                        if (rows[i].size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+            3 -> {
+                item {
+                    IconRow(Icons.Rounded.Favorite, "Liked songs", "${Store.likes.size} songs") {
+                        nav.navigate("pl/__liked__")
+                    }
+                }
+                items(Store.pls.size) { i ->
+                    IconRow(Icons.Rounded.QueueMusic, Store.pls[i].name, "${Store.pls[i].ids.size} songs") {
+                        nav.navigate("pl/${Uri.encode(Store.pls[i].name)}")
+                    }
+                }
+            }
+            else -> {
+                val f = Repo.folders()
+                items(f.size) { i ->
+                    IconRow(Icons.Rounded.Folder, f[i].key, "${f[i].value.size} songs") {
+                        nav.navigate("list/folder/${Uri.encode(f[i].key)}")
+                    }
+                }
+            }
+        }
+    }
+}
+
     var title by remember { mutableStateOf("") }
     var list by remember { mutableStateOf<List<Song>>(emptyList()) }
     val genre by produceState<List<Song>?>(null, type, key) { value = if (type == "genre") Repo.genreSongs(key.toLongOrNull() ?: 0) else null }
